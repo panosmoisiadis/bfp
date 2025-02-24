@@ -13,6 +13,7 @@ import com.bfp.model.exceptions.UnauthorizedException;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
@@ -40,7 +41,9 @@ public class FileHandler {
         UUID fileId = UUID.randomUUID();
         String filename = uploadFile.getOriginalFilename();
         Instant createdAt = Instant.now();
+        String contentType = uploadFile.getContentType();
         String fileLocation = fileDAO.createFile(fileId.toString(), uploadFile);
+
 
         FileDO fileDO = FileDO.builder()
                 .id(fileId)
@@ -50,6 +53,7 @@ public class FileHandler {
                 .fileSize(uploadFile.getSize())
                 .createdAt(createdAt)
                 .updatedAt(createdAt)
+                .contentType(contentType)
                 .build();
 
         fileMetadataDAO.saveFile(fileDO);
@@ -90,7 +94,23 @@ public class FileHandler {
 
         verifyFileOwner(fileDO);
 
-        byte[] fileContent = fileDAO.getFile(fileDO.getId().toString());
+        byte[] fileContent = fileDAO.getFileBytes(fileDO.getId().toString());
+
+        return fileContent;
+    }
+
+    public InputStream downloadFileStream(String fileId) {
+        Optional<FileDO> file =  fileMetadataDAO.getFile(UUID.fromString(fileId));
+
+        if (file.isEmpty()) {
+            throw new ResourceNotFoundException();
+        }
+
+        FileDO fileDO = file.get();
+
+        verifyFileOwner(fileDO);
+
+        InputStream fileContent = fileDAO.getFileSteam(fileDO.getId().toString());
 
         return fileContent;
     }
@@ -159,6 +179,7 @@ public class FileHandler {
                 .id(fileDO.getId())
                 .name(fileDO.getFileName())
                 .size(fileDO.getFileSize())
+                .contentType(fileDO.getContentType())
                 .createdAt(fileDO.getCreatedAt().atOffset(ZoneOffset.UTC))
                 .modifiedAt(fileDO.getUpdatedAt().atOffset(ZoneOffset.UTC))
                 .build();

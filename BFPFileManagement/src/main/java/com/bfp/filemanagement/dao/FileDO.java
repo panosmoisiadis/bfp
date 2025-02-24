@@ -35,4 +35,6 @@ public class FileDO {
     private Instant createdAt;
     @Column(name = "updated_at")
     private Instant updatedAt;
+    @Column(name = "content_type")
+    private String contentType;
 }

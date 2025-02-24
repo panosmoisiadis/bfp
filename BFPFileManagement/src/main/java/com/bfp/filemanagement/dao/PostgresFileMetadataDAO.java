@@ -2,6 +2,7 @@ package com.bfp.filemanagement.dao;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Primary;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -26,7 +27,7 @@ public class PostgresFileMetadataDAO implements FileMetadataDAO {
 
     @Override
     public List<FileDO> getAllFilesByOwnerId(String ownerId) {
-        return fileRepository.findByOwnerId(ownerId);
+        return fileRepository.findByOwnerId(ownerId, Pageable.unpaged());
     }
 
     @Override

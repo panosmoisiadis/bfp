@@ -29,12 +29,24 @@ public class S3FileDAO implements FileDAO {
     }
 
     @Override
-    public byte[] getFile(String fileId) {
+    public byte[] getFileBytes(String fileId) {
         try {
             return s3Client.getObjectAsBytes(GetObjectRequest.builder()
                     .bucket(bucketName)
                     .key(fileId)
                     .build()).asByteArray();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
+    public InputStream getFileSteam(String fileId) {
+        try {
+            return s3Client.getObject(GetObjectRequest.builder()
+                    .bucket(bucketName)
+                    .key(fileId)
+                    .build());
         } catch (Exception e) {
             throw new RuntimeException(e);
         }

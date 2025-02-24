@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS bfp.file_table (
 	file_name text NOT NULL,
 	file_location text NOT NULL,
 	file_size int8 NOT NULL,
+	content_type varchar NULL,
 	created_at timestamptz DEFAULT CURRENT_TIMESTAMP NOT NULL,
 	updated_at timestamptz DEFAULT CURRENT_TIMESTAMP NULL,
 	CONSTRAINT "FileTable_pkey" PRIMARY KEY (id)

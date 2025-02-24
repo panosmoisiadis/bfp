@@ -113,6 +113,7 @@ components:
         - id
         - name
         - size
+        - contentType
         - createdAt
         - modifiedAt
       additionalProperties: false
@@ -125,6 +126,8 @@ components:
         size:
           type: integer
           format: int64
+        contentType:
+          type: string
         createdAt:
           type: string
           format: date-time

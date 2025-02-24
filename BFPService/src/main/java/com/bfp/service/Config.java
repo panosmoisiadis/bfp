@@ -3,10 +3,12 @@ package com.bfp.service;
 import com.bfp.auth.AuthHandler;
 import com.bfp.auth.cognito.CognitoAuthHandler;
 import com.bfp.auth.cognito.CognitoUserPoolClientSecretHashProvider;
+import com.bfp.auth.cognito.EnvVarSecretHashProvider;
 import com.bfp.auth.cognito.SecretsManagerHashProvider;
 import com.bfp.filemanagement.FileHandler;
 import com.bfp.filemanagement.dao.FileDAO;
 import com.bfp.filemanagement.dao.FileMetadataDAO;
+import com.bfp.filemanagement.dao.LocalFileSystemFileDAO;
 import com.bfp.filemanagement.dao.PostgresFileMetadataDAO;
 import com.bfp.filemanagement.dao.S3FileDAO;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -50,7 +52,8 @@ public class Config {
     @Bean
     @Autowired
     public CognitoUserPoolClientSecretHashProvider getCognitoUserPoolClientSecretHashProvider(SecretsManagerClient secretsManagerClient) {
-        return new SecretsManagerHashProvider(secretsManagerClient);
+//        return new SecretsManagerHashProvider(secretsManagerClient);
+        return new EnvVarSecretHashProvider();
     }
 
     @Bean
@@ -66,7 +69,13 @@ public class Config {
     @Bean
     @Autowired
     public FileDAO getFileDAO(S3Client s3Client) {
-        return new S3FileDAO(s3Client, fileBucketName);
+//        return new S3FileDAO(s3Client, fileBucketName);
+        String path = System.getenv("efsMountPoint");
+        if (path == null) {
+            path = fileBucketName;
+        }
+        System.out.println(path);
+        return new LocalFileSystemFileDAO(path);
     }
 
     @Bean

@@ -12,11 +12,15 @@ spring:
     url: jdbc:postgresql://${postgreshost}:5432/postgres?currentSchema=bfp
     username: ${postgresusername}
     password: ${postgrespassword}
+  servlet:
+    multipart:
+      max-file-size: 100MB
+      max-request-size: 100MB
 
   jpa:
     properties:
       hibernate:
-        dialect: org.hibernate.dialect.PostgreSQLDialect
+#        dialect: org.hibernate.dialect.PostgreSQLDialect
         default_schema: bfp
     show-sql: false
 #    hibernate:
