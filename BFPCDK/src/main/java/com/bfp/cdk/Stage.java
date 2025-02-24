@@ -11,6 +11,10 @@ public enum Stage {
         this.stage = stage;
     }
 
+    Stage(String stage, String environment) {
+        this.stage = stage + "-" + environment;
+    }
+
     @Override
     public String toString() {
         return getStage();
