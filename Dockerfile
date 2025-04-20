@@ -3,8 +3,8 @@ FROM maven:3.9.9-amazoncorretto-21 AS build
 ENV HOME=/app
 WORKDIR $HOME
 COPY . .
-RUN mvn -B -e org.apache.maven.plugins:maven-dependency-plugin:3.1.2:go-offline -DexcludeArtifactIds=domain
-RUN mvn -B -e clean install -DskipTests
+RUN mvn -B -e org.apache.maven.plugins:maven-dependency-plugin:3.1.2:go-offline -DexcludeArtifactIds=domain --no-transfer-progress
+RUN mvn -B -e clean install -DskipTests --no-transfer-progress
 # Use an official OpenJDK image as the base image
 
 FROM amazoncorretto:21
