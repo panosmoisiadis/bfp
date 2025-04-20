@@ -4,7 +4,7 @@ ENV HOME=/app
 WORKDIR $HOME
 COPY . .
 RUN mvn -B -e org.apache.maven.plugins:maven-dependency-plugin:3.1.2:go-offline -DexcludeArtifactIds=domain --no-transfer-progress
-RUN mvn -B -e install -DskipTests --no-transfer-progress
+RUN mvn -B -e install --no-transfer-progress
 
 FROM amazoncorretto:21
 WORKDIR /app
