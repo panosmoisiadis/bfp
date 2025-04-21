@@ -17,7 +17,7 @@ public class BFPApp {
                 .build();
 
         BFPServiceStack serviceStack = new BFPServiceStack(app, "BFPService", props, stageEnum);
-        BFPServicePipeline devOpsStack = new BFPServicePipeline(app, "BFPDevOps");
+        BFPServicePipeline devOpsStack = new BFPServicePipeline(app, "BFPServicePipeline");
         app.synth();
     }
 }
