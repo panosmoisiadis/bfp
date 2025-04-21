@@ -6,6 +6,7 @@ import software.amazon.awscdk.services.codebuild.BuildEnvironmentVariable;
 import software.amazon.awscdk.services.codebuild.BuildEnvironmentVariableType;
 import software.amazon.awscdk.services.codebuild.BuildSpec;
 import software.amazon.awscdk.services.codebuild.ComputeType;
+import software.amazon.awscdk.services.codebuild.LinuxArmBuildImage;
 import software.amazon.awscdk.services.codebuild.LinuxArmLambdaBuildImage;
 import software.amazon.awscdk.services.codebuild.PipelineProject;
 import software.amazon.awscdk.services.codepipeline.Artifact;
@@ -94,8 +95,8 @@ public class BFPServicePipeline extends Stack {
                                                                 .role(Role.fromRoleArn(this, "BFPBuildRole", "arn:aws:iam::891377256793:role/service-role/codebuild-BFPBuild-service-role"))
                                                                 .buildSpec(BuildSpec.fromSourceFilename("buildfiles/deploy cdk.yaml"))
                                                                 .environment(BuildEnvironment.builder()
-                                                                        .computeType(ComputeType.LAMBDA_1GB)
-                                                                        .buildImage(LinuxArmLambdaBuildImage.AMAZON_LINUX_2023_CORRETTO_21)
+                                                                        .computeType(ComputeType.SMALL)
+                                                                        .buildImage(LinuxArmBuildImage.AMAZON_LINUX_2_STANDARD_3_0)
                                                                         .environmentVariables(Map.of(
                                                                                 "STACK", BuildEnvironmentVariable.builder()
                                                                                         .value("BFPServicePipeline")
