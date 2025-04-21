@@ -6,18 +6,23 @@ import software.amazon.awscdk.Duration;
 import software.amazon.awscdk.RemovalPolicy;
 import software.amazon.awscdk.services.applicationautoscaling.EnableScalingProps;
 import software.amazon.awscdk.services.certificatemanager.Certificate;
+import software.amazon.awscdk.services.codedeploy.EcsApplication;
+import software.amazon.awscdk.services.codedeploy.EcsBlueGreenDeploymentConfig;
+import software.amazon.awscdk.services.codedeploy.EcsDeploymentConfig;
+import software.amazon.awscdk.services.codedeploy.EcsDeploymentGroup;
 import software.amazon.awscdk.services.cognito.AccountRecovery;
 import software.amazon.awscdk.services.cognito.AuthFlow;
 import software.amazon.awscdk.services.cognito.CfnUserPoolUser;
+import software.amazon.awscdk.services.cognito.CfnUserPoolUserToGroupAttachment;
 import software.amazon.awscdk.services.cognito.CognitoDomainOptions;
+import software.amazon.awscdk.services.cognito.FeaturePlan;
 import software.amazon.awscdk.services.cognito.Mfa;
 import software.amazon.awscdk.services.cognito.PasswordPolicy;
-import software.amazon.awscdk.services.cognito.StandardAttribute;
-import software.amazon.awscdk.services.cognito.StandardAttributes;
 import software.amazon.awscdk.services.cognito.UserPool;
 import software.amazon.awscdk.services.cognito.UserPoolClient;
 import software.amazon.awscdk.services.cognito.UserPoolDomain;
 import software.amazon.awscdk.services.cognito.UserPoolEmail;
+import software.amazon.awscdk.services.cognito.UserPoolGroup;
 import software.amazon.awscdk.services.ec2.InstanceClass;
 import software.amazon.awscdk.services.ec2.InstanceSize;
 import software.amazon.awscdk.services.ec2.InstanceType;
@@ -31,6 +36,8 @@ import software.amazon.awscdk.services.ecs.AwsLogDriverProps;
 import software.amazon.awscdk.services.ecs.ContainerDefinition;
 import software.amazon.awscdk.services.ecs.ContainerImage;
 import software.amazon.awscdk.services.ecs.CpuArchitecture;
+import software.amazon.awscdk.services.ecs.DeploymentController;
+import software.amazon.awscdk.services.ecs.DeploymentControllerType;
 import software.amazon.awscdk.services.ecs.EfsVolumeConfiguration;
 import software.amazon.awscdk.services.ecs.HealthCheck;
 import software.amazon.awscdk.services.ecs.LogDriver;
@@ -46,6 +53,12 @@ import software.amazon.awscdk.services.efs.AccessPointOptions;
 import software.amazon.awscdk.services.efs.Acl;
 import software.amazon.awscdk.services.efs.FileSystem;
 import software.amazon.awscdk.services.efs.PosixUser;
+import software.amazon.awscdk.services.elasticloadbalancingv2.ApplicationListener;
+import software.amazon.awscdk.services.elasticloadbalancingv2.ApplicationProtocol;
+import software.amazon.awscdk.services.elasticloadbalancingv2.ApplicationTargetGroup;
+import software.amazon.awscdk.services.elasticloadbalancingv2.BaseApplicationListenerProps;
+import software.amazon.awscdk.services.elasticloadbalancingv2.ListenerAction;
+import software.amazon.awscdk.services.elasticloadbalancingv2.TargetType;
 import software.amazon.awscdk.services.iam.Effect;
 import software.amazon.awscdk.services.iam.PolicyDocument;
 import software.amazon.awscdk.services.iam.PolicyStatement;
@@ -207,11 +220,14 @@ public class BFPServiceStack extends StagedStack {
                         .startPeriod(Duration.seconds(35))
                         .build())
                 .publicLoadBalancer(true)
-                .certificate(Certificate.fromCertificateArn(this, "ALBCertificate", "arn:aws:acm:us-east-1:891377256793:certificate/36687f83-04bb-42f8-9c7d-a4c115c671be"))
+                .certificate(Certificate.fromCertificateArn(this, "ALBCertificate", "arn:aws:acm:us-west-2:891377256793:certificate/9b5ca52d-cefe-4d78-a13d-b065fca5de81"))
                 .vpc(vpc.getVpc())
                 .securityGroups(List.of(vpc.getSecurityGroup()))
                 .taskSubnets(SubnetSelection.builder()
                         .subnets(vpc.getVpc().getPrivateSubnets())
+                        .build())
+                .deploymentController(DeploymentController.builder()
+                        .type(DeploymentControllerType.CODE_DEPLOY)
                         .build())
                 .build();
 
@@ -227,8 +243,8 @@ public class BFPServiceStack extends StagedStack {
                         .build())
                 .build();
 
-        ContainerDefinition container = fargateService.getTaskDefinition().getDefaultContainer();
-        container.addMountPoints(MountPoint.builder()
+        ContainerDefinition container2 = fargateService.getTaskDefinition().getDefaultContainer();
+        container2.addMountPoints(MountPoint.builder()
                 .containerPath("/efs")
                 .sourceVolume("efs-volume")
                 .readOnly(false)
@@ -255,6 +271,49 @@ public class BFPServiceStack extends StagedStack {
                 .healthyThresholdCount(2)
                 .unhealthyThresholdCount(3)
                 .build());
+
+        ApplicationTargetGroup greenTargetGroup = ApplicationTargetGroup.Builder.create(this, "GreenTargetGroup")
+                .targetType(TargetType.IP)
+                .port(8080)
+                .vpc(vpc.getVpc())
+                .protocol(ApplicationProtocol.HTTP)
+                .healthCheck(software.amazon.awscdk.services.elasticloadbalancingv2.HealthCheck.builder()
+                        .path("/actuator/health")
+                        .healthyHttpCodes("200")
+                        .interval(Duration.seconds(10))
+                        .timeout(Duration.seconds(5))
+                        .healthyThresholdCount(2)
+                        .unhealthyThresholdCount(3)
+                        .build())
+                .build();
+
+// Create a test listener
+        ApplicationListener testListener = fargateService.getLoadBalancer().addListener("TestListener", BaseApplicationListenerProps.builder()
+                .port(8081)
+                .protocol(ApplicationProtocol.HTTP)
+                .defaultAction(ListenerAction.forward(List.of(greenTargetGroup)))
+                .build());
+
+// Create CodeDeploy Application and Deployment Group
+        EcsApplication codeDeployApp = EcsApplication.Builder.create(this, "CodeDeployApplication")
+                .applicationName("MyWebServerApplication")
+                .build();
+
+// Create a deployment group
+        EcsDeploymentGroup deploymentGroup = EcsDeploymentGroup.Builder.create(this, "CodeDeploymentGroup")
+                .application(codeDeployApp)
+                .deploymentGroupName("MyWebServerDeploymentGroup")
+                .deploymentConfig(EcsDeploymentConfig.ALL_AT_ONCE)
+                .service(fargateService.getService())
+                .blueGreenDeploymentConfig(EcsBlueGreenDeploymentConfig.builder()
+                        .listener(fargateService.getListener())
+                        .testListener(testListener)
+                        .blueTargetGroup(fargateService.getTargetGroup())
+                        .greenTargetGroup(greenTargetGroup)
+                        .terminationWaitTime(Duration.minutes(5))
+                        .deploymentApprovalWaitTime(Duration.minutes(10))
+                        .build())
+                .build();
     }
 
     Repository createRepository() {
@@ -329,11 +388,7 @@ public class BFPServiceStack extends StagedStack {
                 .signInCaseSensitive(true)
                 .selfSignUpEnabled(false)
                 .mfa(Mfa.OFF)
-                .standardAttributes(StandardAttributes.builder()
-                        .email(StandardAttribute.builder()
-                                .required(true)
-                                .build())
-                        .build())
+                .featurePlan(FeaturePlan.LITE)
                 .build();
         userPool.applyRemovalPolicy(RemovalPolicy.DESTROY);
 
@@ -342,9 +397,30 @@ public class BFPServiceStack extends StagedStack {
                 .description("UserPoolId")
                 .build());
 
+        UserPoolGroup adminGroup = UserPoolGroup.Builder.create(this, "BFPUserPoolAdminGroup")
+                .userPool(userPool)
+                .build();
+
         CfnUserPoolUser userPoolUser = CfnUserPoolUser.Builder.create(this, "BFPUserPoolUser")
                 .userPoolId(userPool.getUserPoolId())
                 .username("panosmoisiadis")
+                .build();
+
+        CfnUserPoolUser userPoolUser2 = CfnUserPoolUser.Builder.create(this, "BFPUserPoolUser2")
+                .userPoolId(userPool.getUserPoolId())
+                .username("panosmoisiadis2")
+                .build();
+
+        CfnUserPoolUserToGroupAttachment addToAdmin = CfnUserPoolUserToGroupAttachment.Builder.create(this, "BFPUserPoolUserToGroupAttachment")
+                .username(userPoolUser.getRef())
+                .groupName(adminGroup.getGroupName())
+                .userPoolId(userPool.getUserPoolId())
+                .build();
+
+        CfnUserPoolUserToGroupAttachment addToAdmin2 = CfnUserPoolUserToGroupAttachment.Builder.create(this, "BFPUserPoolUserToGroupAttachment2")
+                .username(userPoolUser2.getRef())
+                .groupName(adminGroup.getGroupName())
+                .userPoolId(userPool.getUserPoolId())
                 .build();
 
         return userPool;

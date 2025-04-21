@@ -1,29 +1,21 @@
 version: 0.2
 
 phases:
-  install:
-    runtime-versions:
-      java: corretto21
   pre_build:
     commands:
       - echo $REPOSITORY_URL
       - echo $REPOSITORY_NAME
       - echo Logging in to Amazon ECR...
       - aws --version
-      - aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin $REPOSITORY_URL
+      - aws ecr get-login-password | docker login --username AWS --password-stdin $REPOSITORY_URL
+      - docker buildx create --use --name multiarch-builder --driver docker-container
   build:
     commands:
       - echo Building BFP
-      - mvn install --no-transfer-progress
-      - echo Building the Docker image...
-      - cd BFPService
-      - docker build -t $REPOSITORY_NAME . --provenance=false
-      - docker tag "$REPOSITORY_NAME:latest" "$REPOSITORY_URL/$REPOSITORY_NAME:latest"
+      - docker buildx build --platform linux/amd64,linux/arm64 -t $REPOSITORY_URL/$REPOSITORY_NAME:latest --push .
   post_build:
     commands:
-      - echo Pushing the Docker images...
-      - docker push "$REPOSITORY_URL/$REPOSITORY_NAME:latest"
       - echo Writing image definitions file...
-      - printf '[{"name":"hello-world","imageUri":"%s"}]' $REPOSITORY_URL:$IMAGE_TAG > imagedefinitions.json
+      - printf '[{"imageUri":"%s"}]' $REPOSITORY_URL/$REPOSITORY_NAME:latest > imagedefinitions.json
 artifacts:
   files: imagedefinitions.json
