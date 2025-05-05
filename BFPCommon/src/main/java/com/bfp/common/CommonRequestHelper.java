@@ -15,4 +15,15 @@ public class CommonRequestHelper {
 
         throw new RuntimeException("Could not get user id.");
     }
+
+    public static String getAccessTokenId() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        Object principal = auth.getPrincipal();
+
+        if (principal instanceof Jwt jwt) {
+            return jwt.getClaim("jti");
+        }
+
+        throw new RuntimeException("Could not get access token id.");
+    }
 }

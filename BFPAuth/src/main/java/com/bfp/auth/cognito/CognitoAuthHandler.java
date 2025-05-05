@@ -1,6 +1,7 @@
 package com.bfp.auth.cognito;
 
 import com.bfp.auth.AuthHandler;
+import com.bfp.auth.token.TokenHandler;
 import com.bfp.model.AuthenticateRequest;
 import com.bfp.model.AuthenticateResponse;
 import com.bfp.model.exceptions.UnauthorizedException;
@@ -11,7 +12,9 @@ import software.amazon.awssdk.services.cognitoidentityprovider.model.AdminInitia
 import software.amazon.awssdk.services.cognitoidentityprovider.model.AuthFlowType;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.GlobalSignOutRequest;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.NotAuthorizedException;
+import software.amazon.awssdk.services.cognitoidentityprovider.model.RevokeTokenRequest;
 
+import java.time.Instant;
 import java.util.Map;
 
 public class CognitoAuthHandler implements AuthHandler {
@@ -20,12 +23,16 @@ public class CognitoAuthHandler implements AuthHandler {
     private final CognitoIdentityProviderClient cognitoIdentityProviderClient;
     private final String userPoolId, userPoolClientId;
 
+    private final TokenHandler tokenHandler;
+
     public CognitoAuthHandler(CognitoUserPoolClientSecretHashProvider clientSecretHashProvider,
-                              CognitoIdentityProviderClient cognitoIdentityProviderClient, String clientId, String userPoolId) {
+                              CognitoIdentityProviderClient cognitoIdentityProviderClient, String clientId, String userPoolId,
+                              TokenHandler tokenHandler) {
         this.clientSecretHashProvider = clientSecretHashProvider;
         this.cognitoIdentityProviderClient = cognitoIdentityProviderClient;
         this.userPoolId = userPoolId;
         this.userPoolClientId = clientId;
+        this.tokenHandler = tokenHandler;
     }
 
     @Override
@@ -50,7 +57,7 @@ public class CognitoAuthHandler implements AuthHandler {
         try {
             cognitoResponse = cognitoIdentityProviderClient.adminInitiateAuth(request);
         } catch (NotAuthorizedException notAuthorizedException) {
-            throw new UnauthorizedException("Not authorized to perform operation.");
+            throw new UnauthorizedException();
         }
 
         String accessToken = cognitoResponse.authenticationResult().accessToken();
@@ -67,9 +74,10 @@ public class CognitoAuthHandler implements AuthHandler {
     }
 
     @Override
-    public void signOut(String accessToken) {
+    public void signOut(String accessToken, String accessTokenId, Instant expiry) {
         cognitoIdentityProviderClient.globalSignOut(GlobalSignOutRequest.builder()
                 .accessToken(accessToken)
                 .build());
+        tokenHandler.disableAccessToken(accessTokenId, expiry);
     }
 }
